@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Babylon Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <style>
+    html,body { margin:0; padding:0; background:transparent; height:100%; width:100%; }
+    canvas { width:100%; height:100%; display:block; touch-action:none; }
+    #debug { position: absolute; top:6px; left:6px; z-index:9999; color: #0f0; background: rgba(0,0,0,0.6); padding:6px; font-family:monospace; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div id="debug">Ready</div>
+  <canvas id="renderCanvas"></canvas>
+
+<script>
+  let engine = null;
+  let scene = null;
+
+  function debug(msg) {
+    const d = document.getElementById('debug');
+    if (d) d.innerText = msg;
+    console.log(msg);
+  }
+
+  async function loadBabylonModel(modelRelativePath) {
+    try {
+      debug("Loading model: " + modelRelativePath);
+      const canvas = document.getElementById('renderCanvas');
+
+      // create engine/scene only once
+      if (!engine) {
+        engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+      }
+      if (!scene) {
+        scene = new BABYLON.Scene(engine);
+        scene.clearColor = new BABYLON.Color4(0,0,0,0);
+        const camera = new BABYLON.ArcRotateCamera("cam", Math.PI/2, Math.PI/3, 3, BABYLON.Vector3.Zero(), scene);
+        camera.attachControl(canvas, true);
+        camera.inputs.clear(); // remove user interaction (if you want no controls)
+        camera.useAutoRotationBehavior = false;
+
+        const light = new BABYLON.HemisphericLight("hem", new BABYLON.Vector3(0,1,0), scene);
+        light.intensity = 1.0;
+      }
+
+      // Remove previously loaded meshes (if any)
+      scene.meshes.slice().forEach(m => {
+        if (m.name !== "__root__") m.dispose();
+      });
+
+      // Load model (relative to the HTML file)
+      await BABYLON.SceneLoader.AppendAsync("", modelRelativePath, scene);
+
+      debug("Model appended. Looking for named nodes...");
+
+      const hour = scene.getMeshByName("Hand_Hour");
+      const minute = scene.getMeshByName("Hand_Minutes");
+      const second = scene.getMeshByName("Hand_Seconds");
+
+      debug("Found hands: " + JSON.stringify({ hour: !!hour, minute: !!minute, second: !!second }));
+
+      // animation loop to update hands each frame
+      scene.onBeforeRenderObservable.clear();
+      scene.onBeforeRenderObservable.add(() => {
+        const now = new Date();
+        const h = now.getHours() % 12;
+        const m = now.getMinutes();
+        const s = now.getSeconds();
+        if (hour)   hour.rotation.z = -((h + m/60) * Math.PI / 6);
+        if (minute) minute.rotation.z = -( (m + s/60) * Math.PI / 30 );
+        if (second) second.rotation.z = -( s * Math.PI / 30 );
+      });
+
+      // start render loop (only once)
+      engine.runRenderLoop(() => {
+        if (scene) scene.render();
+      });
+
+      // handle resize
+      window.addEventListener('resize', () => { if (engine) engine.resize(); });
+
+      debug("Animation started");
+    } catch (e) {
+      debug("Error: " + e);
+      console.error(e);
+    }
+  }
+
+  // For debug: try auto-load if model placeholder exists in query string
+  (function tryAuto() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const m = urlParams.get('model');
+    if (m) loadBabylonModel(m);
+  })();
+</script>
+</body>
+</html>
