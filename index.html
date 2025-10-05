@@ -37,9 +37,26 @@
     </div>
   </div>
 
+  <hr>
+  
+  <!-- Row 3: Watch Viewer -->
+  <div class="mb-4">
+    <p>View a 3D Watch model animated in Real-time.</p>
+    <a class="btn btn-success btn-custom" href="html/MorialMod_Watch.html" >Display</a>
+  </div>
+
+  <!-- Script to update model-viewer -->
+  <script>
+    function updateModel() {
+      const selectedModel = document.getElementById('modelSelect').value;
+      const viewer = document.getElementById('viewer');
+      viewer.setAttribute('src', selectedModel);
+    }
+  </script>
+  <hr>
    <!-- Row 2: Model Selector -->
   <div class="mb-4">
-    <p>Select a model from the list to view. Then, using your phone, tap the button at screen bottom to view the model in your area.</p>
+    <p>Or select a model from the list to view. Then, using your phone, tap the button at screen bottom to view the model in your area.</p>
     <div class="row g-2">
       <div class="col-md-6">
         <select class="form-select" id="modelSelect">
@@ -68,22 +85,7 @@
     environment-image="neutral"
   ></model-viewer>
 
-  <hr>
-  
-  <!-- Row 3: Watch Viewer -->
-  <div class="mb-4">
-    <p>Or View a 3D Watch model animated in Real-time.</p>
-    <a class="btn btn-success btn-custom" href="html/MorialMod_Watch.html" >Display</a>
-  </div>
 
-  <!-- Script to update model-viewer -->
-  <script>
-    function updateModel() {
-      const selectedModel = document.getElementById('modelSelect').value;
-      const viewer = document.getElementById('viewer');
-      viewer.setAttribute('src', selectedModel);
-    }
-  </script>
 
 </body>
 </html>
