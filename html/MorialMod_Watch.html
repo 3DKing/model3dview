@@ -1,0 +1,195 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Babylon Watch Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: #000; height: 100%; width: 100%; }
+    canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+    #debug { position: absolute; top: 6px; left: 6px; z-index: 9999; color: #0f0; background: rgba(0,0,0,0.6); padding: 6px; font-family: monospace; font-size: 12px; }
+	
+	#controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10000;
+  display: flex;
+  gap: 8px;
+}
+
+#controls button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background-color: #222;
+  color: #0f0;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 0 5px #0f0;
+  transition: background 0.3s;
+}
+
+#controls button:hover {
+  background-color: #0f0;
+  color: #000;
+}
+
+  </style>
+</head>
+<body>
+  
+  <div id="controls">
+  <button onclick="zoomIn()">＋</button>
+  <button onclick="zoomOut()">－</button>
+  <button onclick="resetZoom()">⟳</button>
+  <button onclick="goBack()">←</button>
+</div>
+
+  <canvas id="renderCanvas"></canvas>
+
+<script>
+  let engine, scene;
+
+  function debug(msg) {
+    const d = document.getElementById('debug');
+    if (d) d.innerText = msg;
+    console.log(msg);
+  }
+
+  async function loadBabylonModel(modelRelativePath) {
+    try {
+      //debug("Loading model: " + modelRelativePath);
+      const canvas = document.getElementById('renderCanvas');
+
+      if (!engine) {
+        engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+      }
+
+      if (!scene) {
+        scene = new BABYLON.Scene(engine);
+        scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
+
+        const camera = new BABYLON.ArcRotateCamera("cam", Math.PI / 2, Math.PI / 3, 3, BABYLON.Vector3.Zero(), scene);
+        camera.attachControl(canvas, true); // ENABLE user interaction
+
+		window.zoomIn = function () {
+		  if (scene && scene.activeCamera) {
+			scene.activeCamera.radius *= 0.9;
+			if (scene.activeCamera.radius<=1.682) scene.activeCamera.radius = 1.6815;
+		  }
+		};
+
+		window.zoomOut = function () {
+		  if (scene && scene.activeCamera) {
+			scene.activeCamera.radius *= 1.1;
+		  }
+		};
+
+		window.resetZoom = function () {
+		  if (scene && scene.activeCamera) {
+			scene.activeCamera.radius = 3;
+		  }
+		};
+
+		window.goBack = function () {
+      debug("Going back");
+      window.history.back(); // Navigates to the previous page
+    };
+		
+        const light = new BABYLON.HemisphericLight("hem", new BABYLON.Vector3(0, 1, 0), scene);
+        light.intensity = 1.0;
+
+        // Add environment for reflections
+        const env = scene.createDefaultEnvironment({
+		  createSkybox: true,
+		  createGround: false, // 👈 disables ground
+		  skyboxSize: 1000
+        });
+        if (env && env.skybox) {
+          env.skybox.material.disableLighting = true;
+        }
+      }
+
+      await BABYLON.SceneLoader.AppendAsync("", modelRelativePath, scene);
+	  
+
+      //debug("Model loaded. Searching for hands...");
+
+      const hour = scene.getMeshByName("Hand_Hours");
+      const minute = scene.getMeshByName("Hand_Minutes");
+      const second = scene.getMeshByName("Hand_Seconds");
+
+      //debug("Found hands: " + JSON.stringify({
+        //hour: !!hour,
+        //minute: !!minute,
+        //second: !!second
+      //})
+	  
+	  //);
+
+	  if (hour) {
+	    hour.rotationQuaternion = null;
+	    hour.freezeWorldMatrix(false);
+	  }
+	  if (minute) {
+	    minute.rotationQuaternion = null;
+	    minute.freezeWorldMatrix(false);
+	  }
+	  if (second) {
+	    //second.rotationQuaternion = null;
+	    //second.freezeWorldMatrix(false);
+	  }
+	  
+
+      scene.onBeforeRenderObservable.clear();
+	  
+	  const baseQuat = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.X, Math.PI / 2); // initial orientation
+	  
+	  second.rotationQuaternion = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.X, Math.PI / 2);
+	  hour.rotationQuaternion = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.X, Math.PI / 2);
+	  minute.rotationQuaternion = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.X, Math.PI / 2);	  
+	  
+	  
+      scene.onBeforeRenderObservable.add(() => {
+
+        const now = new Date();
+        const h = now.getHours() % 12;
+        const m = now.getMinutes();
+        const s = now.getSeconds();
+		const SecQuat = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, -(s * Math.PI / 30)); // animate around Y
+		const MinQuat = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, -((m + s / 60) * Math.PI / 30)); // animate around Y
+		const HourQuat = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, -((h + m / 60) * Math.PI / 6)); // animate around Y
+		
+		
+		if (hour)   hour.rotationQuaternion = baseQuat.multiply(HourQuat);
+		if (minute) minute.rotationQuaternion = baseQuat.multiply(MinQuat);
+		if (second) second.rotationQuaternion = baseQuat.multiply(SecQuat); // combine!
+			
+      });
+
+      engine.runRenderLoop(() => {
+        if (scene) scene.render();
+      });
+
+      window.addEventListener('resize', () => {
+        if (engine) engine.resize();
+      });
+
+      //debug("Animation running");
+    } catch (e) {
+      debug("Error: " + e.message);
+      console.error(e);
+    }
+  }
+
+  // Load default model (replace with your actual filename)
+  loadBabylonModel("models/MorialMod.glb");
+</script>
+</body>
+</html>
+
+
